@@ -1,0 +1,243 @@
+// キャンバスの取得と設定
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// キャンバスをデバイスの全画面に設定
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// 跳ね返り係数（0〜1の範囲）
+const restitution = 0.9;
+
+// ラケットとボールのサイズ（必要に応じて調整可能）
+const paddleRadius = 50 * 2.5; // ラケットの半径を2.5倍に
+const puckRadius = paddleRadius / 2; // ボールの半径
+
+// ボールの初期設定
+let puck = {
+    x: 0, // 左端からスタート
+    y: canvas.height / 2, // キャンバスの中央の高さ
+    radius: puckRadius,
+    speedX: 500, // 右方向に向かって放出（速度を調整）
+    speedY: 0,
+    mass: 1
+};
+
+// ボールの色をベージュに設定
+const puckColor = '#F5F5DC'; // ベージュ
+
+// プレイヤーのラケット設定
+let paddles = [
+    {
+        x: canvas.width / 2,
+        y: canvas.height - paddleRadius * 2,
+        radius: paddleRadius,
+        mass: 1,
+        isTouching: false,
+        touchId: null,
+        visible: false,
+        prevX: 0,
+        prevY: 0,
+        color: '#FF0000' // 赤
+    },
+    {
+        x: canvas.width / 2,
+        y: paddleRadius * 2,
+        radius: paddleRadius,
+        mass: 1,
+        isTouching: false,
+        touchId: null,
+        visible: false,
+        prevX: 0,
+        prevY: 0,
+        color: '#0000FF' // 青
+    }
+];
+
+// 背景色を黒に設定
+function clearCanvas() {
+    ctx.fillStyle = '#000000'; // 黒
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// タッチイベントの設定
+canvas.addEventListener('touchstart', handleTouchStart, false);
+canvas.addEventListener('touchmove', handleTouchMove, false);
+canvas.addEventListener('touchend', handleTouchEnd, false);
+canvas.addEventListener('touchcancel', handleTouchEnd, false);
+
+function handleTouchStart(e) {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+        const touchX = touch.clientX;
+        const touchY = touch.clientY;
+
+        // 画面の上下でプレイヤーを判別
+        let paddle = touchY > canvas.height / 2 ? paddles[0] : paddles[1];
+
+        if (!paddle.isTouching) {
+            paddle.isTouching = true;
+            paddle.touchId = touch.identifier;
+            paddle.x = touchX;
+            paddle.y = touchY;
+            paddle.prevX = touchX;
+            paddle.prevY = touchY;
+            paddle.visible = true;
+        }
+    }
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+        for (let paddle of paddles) {
+            if (paddle.touchId === touch.identifier) {
+                paddle.prevX = paddle.x;
+                paddle.prevY = paddle.y;
+                paddle.x = touch.clientX;
+                paddle.y = touch.clientY;
+            }
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+        for (let paddle of paddles) {
+            if (paddle.touchId === touch.identifier) {
+                paddle.isTouching = false;
+                paddle.touchId = null;
+                paddle.visible = false;
+            }
+        }
+    }
+}
+
+// ボールとラケットの衝突処理
+function handleCollision() {
+    for (let paddle of paddles) {
+        if (paddle.visible) {
+            const dx = puck.x - paddle.x;
+            const dy = puck.y - paddle.y;
+            const distance = Math.hypot(dx, dy);
+            const minDistance = puck.radius + paddle.radius;
+
+            if (distance < minDistance) {
+                // ラケットでボールを押さえる
+                if (paddle.isTouching && distance < paddle.radius - puck.radius) {
+                    puck.x = paddle.x;
+                    puck.y = paddle.y;
+                    puck.speedX = 0;
+                    puck.speedY = 0;
+                } else {
+                    // 弾性衝突の計算
+                    const angle = Math.atan2(dy, dx);
+                    const sin = Math.sin(angle);
+                    const cos = Math.cos(angle);
+
+                    // ボールの速度を回転座標系に変換
+                    const v1 = rotate(puck.speedX, puck.speedY, sin, cos, true);
+                    // ラケットの速度を計算
+                    const paddleSpeedX = (paddle.x - paddle.prevX) * 60;
+                    const paddleSpeedY = (paddle.y - paddle.prevY) * 60;
+                    const v2 = rotate(paddleSpeedX, paddleSpeedY, sin, cos, true);
+
+                    // 衝突後の速度
+                    const vTotal = v1.x - v2.x;
+                    v1.x = ((puck.mass - paddle.mass) * v1.x + 2 * paddle.mass * v2.x) / (puck.mass + paddle.mass);
+                    v1.x += v2.x;
+
+                    // 元の座標系に戻す
+                    const finalVel = rotate(v1.x, v1.y, sin, cos, false);
+                    puck.speedX = finalVel.x * restitution;
+                    puck.speedY = finalVel.y * restitution;
+
+                    // ボールがめり込まないように位置を調整
+                    const overlap = minDistance - distance;
+                    puck.x += (overlap * (dx / distance));
+                    puck.y += (overlap * (dy / distance));
+                }
+            }
+        }
+    }
+
+    // 壁との衝突
+    if (puck.x - puck.radius < 0) {
+        puck.x = puck.radius;
+        puck.speedX = -puck.speedX * restitution;
+    } else if (puck.x + puck.radius > canvas.width) {
+        puck.x = canvas.width - puck.radius;
+        puck.speedX = -puck.speedX * restitution;
+    }
+
+    if (puck.y - puck.radius < 0) {
+        puck.y = puck.radius;
+        puck.speedY = -puck.speedY * restitution;
+    } else if (puck.y + puck.radius > canvas.height) {
+        puck.y = canvas.height - puck.radius;
+        puck.speedY = -puck.speedY * restitution;
+    }
+}
+
+// 速度の回転変換
+function rotate(x, y, sin, cos, reverse) {
+    return {
+        x: reverse ? (x * cos + y * sin) : (x * cos - y * sin),
+        y: reverse ? (y * cos - x * sin) : (y * cos + x * sin)
+    };
+}
+
+// ボールの更新
+function updatePuck(deltaTime) {
+    puck.x += (puck.speedX * deltaTime) / 1000;
+    puck.y += (puck.speedY * deltaTime) / 1000;
+
+    // 摩擦（必要に応じて調整）
+    const friction = 0.995;
+    puck.speedX *= friction;
+    puck.speedY *= friction;
+}
+
+// 描画処理
+function draw() {
+    clearCanvas();
+
+    // ボールの描画
+    ctx.beginPath();
+    ctx.arc(puck.x, puck.y, puck.radius, 0, Math.PI * 2);
+    ctx.fillStyle = puckColor;
+    ctx.fill();
+    ctx.closePath();
+
+    // ラケットの描画
+    for (let paddle of paddles) {
+        if (paddle.visible) {
+            ctx.beginPath();
+            ctx.arc(paddle.x, paddle.y, paddle.radius, 0, Math.PI * 2);
+            ctx.fillStyle = paddle.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+    }
+}
+
+// ゲームループ
+let lastTime = performance.now();
+function gameLoop(now = performance.now()) {
+    const deltaTime = now - lastTime;
+    lastTime = now;
+
+    updatePuck(deltaTime);
+    handleCollision();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+
+// ウィンドウのリサイズに対応
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
