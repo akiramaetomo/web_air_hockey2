@@ -8,38 +8,96 @@
             margin: 0;
             overflow: hidden;
         }
+        
         canvas {
             display: block;
             touch-action: none;
         }
-        /* オプション設定画面のスタイル */
+        
+        /* オプション画面のスタイル */
         #options {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            z-index: 2;
+            font-size: calc(16px * 3); /* 文字サイズを3倍に */
+            width: 90%; /* 画面幅の90% */
+            max-width: 800px; /* 最大幅を設定 */
+            box-sizing: border-box; /* パディングを含めて幅を計算 */
+        }
+        
+        #options label {
+            display: block;
+            margin-bottom: 20px;
+        }
+        
+        #options input[type="checkbox"] {
+            width: 30px;
+            height: 30px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        
+        #closeOptions {
+            font-size: calc(16px * 3);
+            padding: 10px 20px;
+        }
+        
+        /* スコア表示のスタイル */
+        #score {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(255,255,255,0.8);
-            padding: 10px;
-            border-radius: 5px;
+            top: 10px; /* 上から10px */
+            left: 10px; /* 左から10px */
+            color: gray;
+            font-size: calc(24px * 3);
+            font-family: sans-serif;
             z-index: 1;
         }
-        #score {
+        
+        #settingsIcon {
             position: absolute;
             top: 10px;
             right: 10px;
-            color: #ffffff;
-            font-size: 24px;
-            font-family: sans-serif;
+            width: 64px;
+            height: 64px;
+            background: url('./assets/images/settings-icon.png') no-repeat center center;
+            background-size: contain;
             z-index: 1;
+        }
+        
+        /* ゴール時のメッセージ表示 */
+        #goalMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffffff;
+            font-size: calc(48px * 3);
+            font-family: sans-serif;
+            z-index: 2;
+            display: none;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div id="settingsIcon"></div>
     <div id="options">
-        <label><input type="checkbox" id="penaltyGoal"> ゴールサイズのペナルティ</label><br>
+        <h2>オプション設定</h2>
+        <label><input type="checkbox" id="penaltyGoal"> ゴールサイズのペナルティ</label>
         <label><input type="checkbox" id="penaltyPaddle"> ラケットサイズのペナルティ</label>
+        <label><input type="checkbox" id="allowInvasion"> 相手陣地への侵入を許可</label>
+        <!-- 新しいオプションを追加 -->
+        <label><input type="checkbox" id="alwaysShowPaddle" checked> マレットを常時表示</label>
+        <button id="closeOptions">閉じる</button>
     </div>
-    <div id="score">Player 1: 0 | Player 2: 0</div>
+    <div id="score">-- : --</div>
+    <div id="goalMessage">GOAL!</div>
     <script src="./assets/scripts/game.js"></script>
 </body>
 </html>
