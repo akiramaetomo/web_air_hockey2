@@ -7,18 +7,33 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 // 跳ね返り係数（0〜1の範囲）
-const restitution = 0.9;
+let restitution = 0.9;
+
+// オプション設定の取得
+const penaltyGoalCheckbox = document.getElementById('penaltyGoal');
+const penaltyPaddleCheckbox = document.getElementById('penaltyPaddle');
+
+// スコア表示の要素
+const scoreElement = document.getElementById('score');
+
+// スコアの初期化
+let scores = [0, 0]; // [Player 1, Player 2]
+
+// ゴールサイズの初期設定
+const baseGoalWidth = puckRadius * 3;
+let goalWidth = baseGoalWidth;
 
 // ラケットとボールのサイズ（必要に応じて調整可能）
-const paddleRadius = 50 * 2.5; // ラケットの半径を2.5倍に
+let paddleRadius = 50 * 2.5; // ラケットの半径を2.5倍に
+const basePaddleRadius = paddleRadius; // ラケットの初期サイズを保持
 const puckRadius = paddleRadius / 2; // ボールの半径
 
 // ボールの初期設定
 let puck = {
-    x: 0, // 左端からスタート
-    y: canvas.height / 2, // キャンバスの中央の高さ
+    x: canvas.width / 2,
+    y: canvas.height / 2,
     radius: puckRadius,
-    speedX: 500, // 右方向に向かって放出（速度を調整）
+    speedX: 500,
     speedY: 0,
     mass: 1
 };
@@ -162,7 +177,23 @@ function handleCollision() {
         }
     }
 
-    // 壁との衝突
+    // ラケット同士の重なりを防止
+    const dx = paddles[0].x - paddles[1].x;
+    const dy = paddles[0].y - paddles[1].y;
+    const distance = Math.hypot(dx, dy);
+    const minDistance = paddles[0].radius + paddles[1].radius;
+    if (distance < minDistance) {
+        const overlap = (minDistance - distance) / 2;
+        const offsetX = (dx / distance) * overlap;
+        const offsetY = (dy / distance) * overlap;
+
+        paddles[0].x += offsetX;
+        paddles[0].y += offsetY;
+        paddles[1].x -= offsetX;
+        paddles[1].y -= offsetY;
+    }
+
+    // 壁との衝突（左右の壁のみ）
     if (puck.x - puck.radius < 0) {
         puck.x = puck.radius;
         puck.speedX = -puck.speedX * restitution;
@@ -171,13 +202,83 @@ function handleCollision() {
         puck.speedX = -puck.speedX * restitution;
     }
 
+    // ゴールの判定（手前と奥）
     if (puck.y - puck.radius < 0) {
-        puck.y = puck.radius;
-        puck.speedY = -puck.speedY * restitution;
+        // 上側のゴール（Player 1が得点）
+        if (puck.x > (canvas.width / 2 - goalWidth / 2) && puck.x < (canvas.width / 2 + goalWidth / 2)) {
+            // Player 1に得点
+            scores[0]++;
+            updateScore();
+            resetGame(1);
+        } else {
+            // 壁に当たる場合
+            puck.y = puck.radius;
+            puck.speedY = -puck.speedY * restitution;
+        }
     } else if (puck.y + puck.radius > canvas.height) {
-        puck.y = canvas.height - puck.radius;
-        puck.speedY = -puck.speedY * restitution;
+        // 下側のゴール（Player 2が得点）
+        if (puck.x > (canvas.width / 2 - goalWidth / 2) && puck.x < (canvas.width / 2 + goalWidth / 2)) {
+            // Player 2に得点
+            scores[1]++;
+            updateScore();
+            resetGame(0);
+        } else {
+            // 壁に当たる場合
+            puck.y = canvas.height - puck.radius;
+            puck.speedY = -puck.speedY * restitution;
+        }
     }
+}
+
+// スコアの更新
+function updateScore() {
+    scoreElement.textContent = `Player 1: ${scores[0]} | Player 2: ${scores[1]}`;
+    checkWin();
+}
+
+// 勝利条件のチェック
+function checkWin() {
+    if (scores[0] >= 10) {
+        alert('Player 1 wins!');
+        resetFullGame();
+    } else if (scores[1] >= 10) {
+        alert('Player 2 wins!');
+        resetFullGame();
+    }
+}
+
+// ゲームのリセット
+function resetGame(scoredPlayer) {
+    // ボールを中央にリセット
+    puck.x = canvas.width / 2;
+    puck.y = canvas.height / 2;
+    // ボールの速度をリセット
+    puck.speedX = 500 * (Math.random() > 0.5 ? 1 : -1);
+    puck.speedY = 500 * (Math.random() > 0.5 ? 1 : -1);
+
+    // ペナルティの適用
+    if (penaltyGoalCheckbox.checked) {
+        // 得点された側のゴールを広げる
+        goalWidth *= 1.25;
+    }
+    if (penaltyPaddleCheckbox.checked) {
+        // 得点された側のラケットを小さくする
+        paddles[scoredPlayer].radius *= 0.8;
+        paddles[scoredPlayer].mass *= 0.8; // 質量も同割合で減少
+    }
+}
+
+// ゲーム全体のリセット
+function resetFullGame() {
+    scores = [0, 0];
+    updateScore();
+    goalWidth = baseGoalWidth;
+    paddleRadius = basePaddleRadius;
+    paddles.forEach(paddle => {
+        paddle.radius = paddleRadius;
+        paddle.mass = 1;
+    });
+    resetGame(0);
 }
 
 // 速度の回転変換
@@ -194,7 +295,7 @@ function updatePuck(deltaTime) {
     puck.y += (puck.speedY * deltaTime) / 1000;
 
     // 摩擦（必要に応じて調整）
-    const friction = 0.995;
+    const friction = 0.999;
     puck.speedX *= friction;
     puck.speedY *= friction;
 }
@@ -202,6 +303,22 @@ function updatePuck(deltaTime) {
 // 描画処理
 function draw() {
     clearCanvas();
+
+    // 左右の壁を描画
+    ctx.fillStyle = '#FFFFFF'; // 白
+    ctx.fillRect(0, 0, 5, canvas.height); // 左壁
+    ctx.fillRect(canvas.width - 5, 0, 5, canvas.height); // 右壁
+
+    // 手前と奥の壁を描画
+    // 上側の壁（奥）
+    ctx.fillStyle = paddles[1].color;
+    ctx.fillRect(5, 0, (canvas.width - goalWidth) / 2 - 5, 10); // 左部分
+    ctx.fillRect((canvas.width + goalWidth) / 2, 0, (canvas.width - goalWidth) / 2 - 5, 10); // 右部分
+
+    // 下側の壁（手前）
+    ctx.fillStyle = paddles[0].color;
+    ctx.fillRect(5, canvas.height - 10, (canvas.width - goalWidth) / 2 - 5, 10); // 左部分
+    ctx.fillRect((canvas.width + goalWidth) / 2, canvas.height - 10, (canvas.width - goalWidth) / 2 - 5, 10); // 右部分
 
     // ボールの描画
     ctx.beginPath();
@@ -240,4 +357,5 @@ gameLoop();
 window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    resetGame(0);
 });

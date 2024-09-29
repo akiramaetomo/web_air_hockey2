@@ -6,17 +6,40 @@
     <style>
         body {
             margin: 0;
-            overflow: hidden; /* スクロールバーを非表示にする */
+            overflow: hidden;
         }
         canvas {
             display: block;
-            touch-action: none; /* タッチ操作を有効にする */
+            touch-action: none;
+        }
+        /* オプション設定画面のスタイル */
+        #options {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1;
+        }
+        #score {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #ffffff;
+            font-size: 24px;
+            font-family: sans-serif;
+            z-index: 1;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <!-- ゲームのスクリプトを読み込む -->
+    <div id="options">
+        <label><input type="checkbox" id="penaltyGoal"> ゴールサイズのペナルティ</label><br>
+        <label><input type="checkbox" id="penaltyPaddle"> ラケットサイズのペナルティ</label>
+    </div>
+    <div id="score">Player 1: 0 | Player 2: 0</div>
     <script src="./assets/scripts/game.js"></script>
 </body>
 </html>
