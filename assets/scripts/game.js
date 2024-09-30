@@ -43,7 +43,8 @@ let paddleRadius = basePaddleRadius;
 let puckRadius = paddleRadius * 0.7;
 
 // ゴールサイズの初期設定（マレットサイズ × 1.5）
-let goalWidth = paddleRadius * 2 * 1.5;
+let goalWidthTop = paddleRadius * 2 * 1.5;
+let goalWidthBottom = paddleRadius * 2 * 1.5;
 
 // ボールの初期設定
 let puck = {
@@ -219,8 +220,8 @@ function handleWallCollision() {
     // 上の壁との衝突（ゴールエリアを除く）
     if (puck.y - puck.radius < wallThickness) {
         if (
-            puck.x + puck.radius > (canvas.width / 2 - goalWidth / 2) &&
-            puck.x - puck.radius < (canvas.width / 2 + goalWidth / 2)
+            puck.x + puck.radius > (canvas.width / 2 - goalWidthTop / 2) &&
+            puck.x - puck.radius < (canvas.width / 2 + goalWidthTop / 2)
         ) {
             // ゴールエリアなので壁との衝突はなし
         } else {
@@ -231,8 +232,8 @@ function handleWallCollision() {
     // 下の壁との衝突（ゴールエリアを除く）
     if (puck.y + puck.radius > canvas.height - wallThickness) {
         if (
-            puck.x + puck.radius > (canvas.width / 2 - goalWidth / 2) &&
-            puck.x - puck.radius < (canvas.width / 2 + goalWidth / 2)
+            puck.x + puck.radius > (canvas.width / 2 - goalWidthBottom / 2) &&
+            puck.x - puck.radius < (canvas.width / 2 + goalWidthBottom / 2)
         ) {
             // ゴールエリアなので壁との衝突はなし
         } else {
@@ -269,7 +270,7 @@ function handlePaddleWallCollision(paddle) {
     }
 }
 
-// ゴール判定の改善（省略なし）
+// ゴール判定の改善
 function handleGoal() {
     if (puck.y + puck.radius < 0) {
         // 上側のゴール（Player 1が得点）
@@ -280,7 +281,7 @@ function handleGoal() {
         setTimeout(() => {
             scores[0]++;
             updateScore();
-            resetGame(1);
+            resetGame(1, 'top'); // 'top' を追加
             isGoal = false;
         }, 1000);
     } else if (puck.y - puck.radius > canvas.height) {
@@ -292,7 +293,7 @@ function handleGoal() {
         setTimeout(() => {
             scores[1]++;
             updateScore();
-            resetGame(0);
+            resetGame(0, 'bottom'); // 'bottom' を追加
             isGoal = false;
         }, 1000);
     }
@@ -437,8 +438,8 @@ function checkWin() {
     }
 }
 
-// ゲームのリセット（省略なし）
-function resetGame(scoredPlayer) {
+// ゲームのリセット
+function resetGame(scoredPlayer, goalSide) { // goalSide を追加
     // ボールを中央にリセット
     puck.x = canvas.width / 2;
     puck.y = canvas.height / 2;
@@ -448,8 +449,13 @@ function resetGame(scoredPlayer) {
 
     // ペナルティの適用
     if (penaltyGoalCheckbox.checked) {
-        // 得点された側のゴールを広げる
-        goalWidth *= 1.25;
+        if (goalSide === 'top') {
+            // 上側のゴールを広げる
+            goalWidthTop *= 1.25;
+        } else if (goalSide === 'bottom') {
+            // 下側のゴールを広げる
+            goalWidthBottom *= 1.25;
+        }
     }
     if (penaltyPaddleCheckbox.checked && paddles[scoredPlayer]) {
         // 得点された側のラケットを小さくする
@@ -470,7 +476,7 @@ function resetGame(scoredPlayer) {
     });
 }
 
-// ゲーム全体のリセット（省略なし）
+// ゲーム全体のリセット
 function resetFullGame() {
     scores = [0, 0];
     updateScore();
@@ -487,8 +493,9 @@ function resetFullGame() {
         }
     });
     // ゴールサイズをリセット
-    goalWidth = paddleRadius * 2 * 1.5;
-    resetGame(0);
+    goalWidthTop = paddleRadius * 2 * 1.5;
+    goalWidthBottom = paddleRadius * 2 * 1.5;
+    resetGame(0, 'bottom'); // どちらか一方の側でリセット
 }
 
 // 速度の回転変換（省略なし）
@@ -540,7 +547,7 @@ function updatePaddles(deltaTime) {
     });
 }
 
-// 描画処理（省略なし）
+// 描画処理
 function draw() {
     clearCanvas();
 
@@ -549,16 +556,35 @@ function draw() {
     ctx.fillRect(0, 0, wallThickness, canvas.height); // 左壁
     ctx.fillRect(canvas.width - wallThickness, 0, wallThickness, canvas.height); // 右壁
 
-    // 手前と奥の壁を描画
     // 上側の壁（奥）
     ctx.fillStyle = paddles[1].color;
-    ctx.fillRect(wallThickness, 0, (canvas.width - goalWidth) / 2 - wallThickness, wallThickness * 2); // 左部分
-    ctx.fillRect((canvas.width + goalWidth) / 2, 0, (canvas.width - goalWidth) / 2 - wallThickness, wallThickness * 2); // 右部分
+    ctx.fillRect(
+        wallThickness,
+        0,
+        (canvas.width - goalWidthTop) / 2 - wallThickness,
+        wallThickness * 2
+    ); // 左部分
+    ctx.fillRect(
+        (canvas.width + goalWidthTop) / 2,
+        0,
+        (canvas.width - goalWidthTop) / 2 - wallThickness,
+        wallThickness * 2
+    ); // 右部分
 
     // 下側の壁（手前）
     ctx.fillStyle = paddles[0].color;
-    ctx.fillRect(wallThickness, canvas.height - wallThickness * 2, (canvas.width - goalWidth) / 2 - wallThickness, wallThickness * 2); // 左部分
-    ctx.fillRect((canvas.width + goalWidth) / 2, canvas.height - wallThickness * 2, (canvas.width - goalWidth) / 2 - wallThickness, wallThickness * 2); // 右部分
+    ctx.fillRect(
+        wallThickness,
+        canvas.height - wallThickness * 2,
+        (canvas.width - goalWidthBottom) / 2 - wallThickness,
+        wallThickness * 2
+    ); // 左部分
+    ctx.fillRect(
+        (canvas.width + goalWidthBottom) / 2,
+        canvas.height - wallThickness * 2,
+        (canvas.width - goalWidthBottom) / 2 - wallThickness,
+        wallThickness * 2
+    ); // 右部分
 
     // ボールの描画
     ctx.beginPath();
@@ -579,7 +605,7 @@ function draw() {
     }
 }
 
-// ゲームループ（省略なし）
+// ゲームループ
 let lastTime = performance.now();
 function gameLoop(now = performance.now()) {
     const deltaTime = now - lastTime;
@@ -593,10 +619,10 @@ function gameLoop(now = performance.now()) {
 }
 
 // ゲーム開始時にリセット
-resetGame(0);
+resetGame(0, 'bottom');
 gameLoop();
 
-// ウィンドウのリサイズに対応（省略なし）
+// ウィンドウのリサイズに対応
 window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -611,20 +637,21 @@ window.addEventListener('resize', () => {
     // パックのサイズを更新
     puck.radius = paddleRadius * 0.7;
     // ゴールサイズを更新
-    goalWidth = paddleRadius * 2 * 1.5;
+    goalWidthTop = paddleRadius * 2 * 1.5;
+    goalWidthBottom = paddleRadius * 2 * 1.5;
 });
 
-// 設定アイコンのクリックイベント（省略なし）
+// 設定アイコンのクリックイベント
 settingsIcon.addEventListener('click', () => {
     optionsMenu.style.display = 'block';
 });
 
-// オプション画面の閉じるボタン（省略なし）
+// オプション画面の閉じるボタン
 closeOptionsButton.addEventListener('click', () => {
     optionsMenu.style.display = 'none';
 });
 
-// オプション変更時のイベントリスナー（省略なし）
+// オプション変更時のイベントリスナー
 alwaysShowPaddleCheckbox.addEventListener('change', () => {
     paddles.forEach(paddle => {
         if (alwaysShowPaddleCheckbox.checked) {
