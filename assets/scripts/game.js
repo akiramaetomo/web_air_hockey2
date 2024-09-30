@@ -13,7 +13,8 @@ let scale = Math.min(canvas.width, canvas.height) / 800; // 基準値800は調�
 let restitution = 0.9;
 
 // オプション設定の取得
-const penaltyGoalCheckbox = document.getElementById('penaltyGoal');
+const penaltyGoalScoredSideCheckbox = document.getElementById('penaltyGoalScoredSide');
+const penaltyGoalConcededSideCheckbox = document.getElementById('penaltyGoalConcededSide');
 const penaltyPaddleCheckbox = document.getElementById('penaltyPaddle');
 const allowInvasionCheckbox = document.getElementById('allowInvasion'); // 相手陣地への侵入を許可
 const alwaysShowPaddleCheckbox = document.getElementById('alwaysShowPaddle'); // マレットを常時表示
@@ -58,6 +59,30 @@ let puck = {
 
 // ボールの色をベージュに設定
 const puckColor = '#F5F5DC'; // ベージュ
+
+// 効果音のロードと設定
+const sounds = {
+    goal: new Audio('./assets/sounds/goal.wav'),
+    paddleWall: new Audio('./assets/sounds/paddle_wall.wav'),
+    puckWall: new Audio('./assets/sounds/puck_wall.wav'),
+    paddlePuck: new Audio('./assets/sounds/paddle_puck.wav'),
+    paddlePaddle: new Audio('./assets/sounds/paddle_paddle.wav')
+};
+
+// 各効果音のボリュームを0.25に設定
+for (let key in sounds) {
+    if (sounds.hasOwnProperty(key)) {
+        sounds[key].volume = 0.25;
+    }
+}
+
+// 効果音を再生する関数
+function playSound(sound) {
+    if (sounds[sound]) {
+        sounds[sound].currentTime = 0; // 再生位置をリセット
+        sounds[sound].play();
+    }
+}
 
 // プレイヤーのラケット設定
 let paddles = [
@@ -207,15 +232,19 @@ let isGoal = false;
 
 // 壁との衝突処理（パックのみ）
 function handleWallCollision() {
+    let collided = false;
+
     // 左の壁との衝突
     if (puck.x - puck.radius < wallThickness) {
         puck.x = puck.radius + wallThickness;
         puck.speedX = -puck.speedX * restitution;
+        collided = true;
     }
     // 右の壁との衝突
     if (puck.x + puck.radius > canvas.width - wallThickness) {
         puck.x = canvas.width - puck.radius - wallThickness;
         puck.speedX = -puck.speedX * restitution;
+        collided = true;
     }
     // 上の壁との衝突（ゴールエリアを除く）
     if (puck.y - puck.radius < wallThickness) {
@@ -227,6 +256,7 @@ function handleWallCollision() {
         } else {
             puck.y = puck.radius + wallThickness;
             puck.speedY = -puck.speedY * restitution;
+            collided = true;
         }
     }
     // 下の壁との衝突（ゴールエリアを除く）
@@ -239,7 +269,12 @@ function handleWallCollision() {
         } else {
             puck.y = canvas.height - puck.radius - wallThickness;
             puck.speedY = -puck.speedY * restitution;
+            collided = true;
         }
+    }
+
+    if (collided) {
+        playSound('puckWall');
     }
 }
 
@@ -247,25 +282,35 @@ function handleWallCollision() {
 function handlePaddleWallCollision(paddle) {
     // マレットがタッチされていない場合のみ
     if (!paddle.isTouching) {
+        let collided = false;
+
         // 左の壁との衝突
         if (paddle.x - paddle.radius < wallThickness) {
             paddle.x = paddle.radius + wallThickness;
             paddle.vx = -paddle.vx * restitution;
+            collided = true;
         }
         // 右の壁との衝突
         if (paddle.x + paddle.radius > canvas.width - wallThickness) {
             paddle.x = canvas.width - paddle.radius - wallThickness;
             paddle.vx = -paddle.vx * restitution;
+            collided = true;
         }
         // 上の壁との衝突
         if (paddle.y - paddle.radius < wallThickness) {
             paddle.y = paddle.radius + wallThickness;
             paddle.vy = -paddle.vy * restitution;
+            collided = true;
         }
         // 下の壁との衝突
         if (paddle.y + paddle.radius > canvas.height - wallThickness) {
             paddle.y = canvas.height - paddle.radius - wallThickness;
             paddle.vy = -paddle.vy * restitution;
+            collided = true;
+        }
+
+        if (collided) {
+            playSound('paddleWall');
         }
     }
 }
@@ -278,6 +323,10 @@ function handleGoal() {
         puck.speedY = 0;
         isGoal = true;
         displayGoalMessage();
+
+        // ゴール音を再生
+        playSound('goal');
+
         setTimeout(() => {
             scores[0]++;
             updateScore();
@@ -290,6 +339,10 @@ function handleGoal() {
         puck.speedY = 0;
         isGoal = true;
         displayGoalMessage();
+
+        // ゴール音を再生
+        playSound('goal');
+
         setTimeout(() => {
             scores[1]++;
             updateScore();
@@ -354,6 +407,9 @@ function handleCollision() {
 
                 // マレットの位置を境界内に制限
                 enforcePaddleBoundaries(paddle);
+
+                // パックとマレットの衝突音を再生
+                playSound('paddlePuck');
             }
         }
     }
@@ -406,6 +462,9 @@ function handlePaddleCollision() {
         paddles[0].vy = finalV1.y;
         paddles[1].vx = finalV2.x;
         paddles[1].vy = finalV2.y;
+
+        // マレット同士の衝突音を再生
+        playSound('paddlePaddle');
     }
 }
 
@@ -448,15 +507,30 @@ function resetGame(scoredPlayer, goalSide) { // goalSide を追加
     puck.speedY = 500 * (Math.random() > 0.5 ? 1 : -1) * scale;
 
     // ペナルティの適用
-    if (penaltyGoalCheckbox.checked) {
+    if (penaltyGoalScoredSideCheckbox.checked || penaltyGoalConcededSideCheckbox.checked) {
         if (goalSide === 'top') {
-            // 上側のゴールを広げる
-            goalWidthTop *= 1.25;
+            // Player 1が得点（上側のゴール）
+            if (penaltyGoalScoredSideCheckbox.checked) {
+                // 得点した側（Player 1）のゴール（下側）を広げる
+                goalWidthBottom *= 1.25;
+            }
+            if (penaltyGoalConcededSideCheckbox.checked) {
+                // 得点された側（Player 2）のゴール（上側）を広げる
+                goalWidthTop *= 1.25;
+            }
         } else if (goalSide === 'bottom') {
-            // 下側のゴールを広げる
-            goalWidthBottom *= 1.25;
+            // Player 2が得点（下側のゴール）
+            if (penaltyGoalScoredSideCheckbox.checked) {
+                // 得点した側（Player 2）のゴール（上側）を広げる
+                goalWidthTop *= 1.25;
+            }
+            if (penaltyGoalConcededSideCheckbox.checked) {
+                // 得点された側（Player 1）のゴール（下側）を広げる
+                goalWidthBottom *= 1.25;
+            }
         }
     }
+
     if (penaltyPaddleCheckbox.checked && paddles[scoredPlayer]) {
         // 得点された側のラケットを小さくする
         paddles[scoredPlayer].radius *= 0.8;
